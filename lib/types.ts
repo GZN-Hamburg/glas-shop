@@ -113,3 +113,53 @@ export interface CartItem {
   preis: number;
   menge: number;
 }
+
+// ─── Checkout / Adresse ──────────────────────────────────────────────────────
+
+export type Versandart =
+  | "palette"       // Standardpalette (€ 89)
+  | "sondertransport" // Sperrgut / Sondertransport (€ 189)
+  | "abholung";     // Selbstabholung Hamburg (kostenlos)
+
+export const VERSANDPREISE: Record<Versandart, number> = {
+  palette: 89,
+  sondertransport: 189,
+  abholung: 0,
+};
+
+export interface Adresse {
+  vorname: string;
+  nachname: string;
+  email: string;
+  telefon?: string;
+  firma?: string;
+  strasse: string;
+  hausnummer: string;
+  plz: string;
+  ort: string;
+  land: string;
+}
+
+// ─── Bestellung (für spätere DB-Anbindung) ───────────────────────────────────
+
+export type BestellStatus =
+  | "neu"
+  | "in_produktion"
+  | "versandbereit"
+  | "versandt"
+  | "geliefert"
+  | "storniert";
+
+export interface Bestellung {
+  id: string;
+  auftragsnummer: string;
+  status: BestellStatus;
+  createdAt: string;
+  lieferadresse: Adresse;
+  versandart: Versandart;
+  positionen: CartItem[];
+  versandkosten: number;
+  gesamtBrutto: number;
+  stripeSessionId?: string;
+  stripePaymentIntentId?: string;
+}
