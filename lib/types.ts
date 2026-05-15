@@ -1,28 +1,68 @@
+// ─── Spiegel ─────────────────────────────────────────────────────────────────
+
 export type SpiegelForm =
   | "rechteckig"
-  | "rund"
+  | "rundbogen"
   | "oval"
-  | "schraegschnitt";
+  | "rund"
+  | "schraegschnitt"
+  | "eckabschnitt-1"
+  | "eckabschnitt-2"
+  | "achteck"
+  | "halbrund";
 
-export type SpiegelBeleuchtung =
-  | "keine"
-  | "umlaufend"
-  | "oben"
-  | "links-rechts"
-  | "hinterleuchtet";
+export type GlasStaerke = 3 | 4 | 5 | 6 | 8 | 10 | 12;
 
-export type SpiegelRahmen = "rahmenlos" | "chrom" | "schwarz" | "gold";
+export type Kantenbearbeitung =
+  | "SK"           // Schnittkante (roh)
+  | "KM"           // Kante matt geschliffen
+  | "KP"           // Kante poliert
+  | "steilfacette" // Steilfacette
+  | "facette10"    // Facette 10 mm
+  | "facette25";   // Facette 25 mm
+
+export type Eckentyp = "scharf" | "R5" | "R10" | "R20" | "abgeschraegt";
+
+export type Befestigung =
+  | "klebung"        // unsichtbare Klebung
+  | "spiegelhalter"  // Spiegelhalter (Edelstahl)
+  | "profil"         // Aufhänge-Profil
+  | "stockschrauben"; // Stockschrauben
+
+export type Veredelung = "keine" | "satiniert" | "getoent" | "sandgestrahlt";
+
+export interface Bohrung {
+  durchmesser: number; // mm (typisch 8–30)
+  x: number;           // mm Abstand von linker Kante
+  y: number;           // mm Abstand von oberer Kante
+}
 
 export interface SpiegelConfig {
   form: SpiegelForm;
-  breite: number;
-  hoehe: number;
-  beleuchtung: SpiegelBeleuchtung;
-  rahmen: SpiegelRahmen;
-  schraegSchnittWinkel?: number;
-  beschlag: boolean;
-  steckdose: boolean;
+  breite: number;        // mm, 300–2200
+  hoehe: number;         // mm, 300–2200
+  glasStaerke: GlasStaerke;
+  kante: Kantenbearbeitung;
+  ecken: Eckentyp;
+  veredelung: Veredelung;
+  befestigung: Befestigung;
+  bohrungen: Bohrung[];
+  menge: number;
 }
+
+export interface PriceBreakdown {
+  flaeche: number;            // tatsächliche Fläche m²
+  berechneteFlaeche: number;  // berechnete Fläche (min. 0,5 m²)
+  mindestberechnung: boolean; // true wenn Mindestfläche greift
+  posMaterial: number;        // Grundmaterial
+  posKante: number;           // Kantenmeter
+  posBohrungen: number;       // Bohrungen
+  posVeredelung: number;      // Veredelung
+  posRuestkosten: number;     // Rüstkosten
+  gesamt: number;             // Gesamtpreis (inkl. Menge)
+}
+
+// ─── Glasdusche ──────────────────────────────────────────────────────────────
 
 export type GlasduscheTyp =
   | "nische"
@@ -36,14 +76,15 @@ export type ProfilFarbe = "silber" | "schwarz" | "weissaluminium" | "profillos";
 
 export interface GlasduscheConfig {
   typ: GlasduscheTyp;
-  breite: number;
-  hoehe: number;
+  breite: number;        // mm
+  hoehe: number;         // mm
   glasArt: GlasArt;
   glasStaerke: 6 | 8 | 10;
   profilFarbe: ProfilFarbe;
-  tuerBreite?: number;
   nanoBeschichtung: boolean;
 }
+
+// ─── Glastrennwand ───────────────────────────────────────────────────────────
 
 export type TrennwandTyp =
   | "festverglasung"
@@ -53,8 +94,8 @@ export type TrennwandTyp =
 
 export interface GlastrennwandConfig {
   typ: TrennwandTyp;
-  breite: number;
-  hoehe: number;
+  breite: number;        // mm pro Element
+  hoehe: number;         // mm
   glasArt: GlasArt;
   glasStaerke: 8 | 10 | 12;
   profilFarbe: ProfilFarbe;
@@ -62,9 +103,12 @@ export interface GlastrennwandConfig {
   schallschutz: boolean;
 }
 
+// ─── Warenkorb ───────────────────────────────────────────────────────────────
+
 export interface CartItem {
   id: string;
   typ: "spiegel" | "glasdusche" | "glastrennwand";
+  bezeichnung: string;
   config: SpiegelConfig | GlasduscheConfig | GlastrennwandConfig;
   preis: number;
   menge: number;

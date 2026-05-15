@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { berechneGlasdusche } from "@/lib/pricing";
+import { useCartStore } from "@/lib/store";
 import type { GlasduscheConfig } from "@/lib/types";
 
 const TYPEN = [
@@ -29,8 +30,8 @@ const STAERKEN = [6, 8, 10] as const;
 
 const DEFAULT: GlasduscheConfig = {
   typ: "nische",
-  breite: 90,
-  hoehe: 200,
+  breite: 900,
+  hoehe: 2000,
   glasArt: "klar",
   glasStaerke: 8,
   profilFarbe: "silber",
@@ -198,6 +199,7 @@ function DuschePreview({ config }: { config: GlasduscheConfig }) {
 export default function GlasduscheKonfigurator() {
   const [config, setConfig] = useState<GlasduscheConfig>(DEFAULT);
   const [added, setAdded] = useState(false);
+  const addToCart = useCartStore((s) => s.addItem);
 
   const set = <K extends keyof GlasduscheConfig>(k: K, v: GlasduscheConfig[K]) =>
     setConfig((c) => ({ ...c, [k]: v }));
@@ -215,8 +217,8 @@ export default function GlasduscheKonfigurator() {
         <div>
           <SectionTitle>Maße</SectionTitle>
           <div className="grid grid-cols-2 gap-3">
-            <NumberInput label="Breite" unit="cm" value={config.breite} min={60} max={300} onChange={(v) => set("breite", v)} />
-            <NumberInput label="Höhe" unit="cm" value={config.hoehe} min={150} max={250} onChange={(v) => set("hoehe", v)} />
+            <NumberInput label="Breite" unit="mm" value={config.breite} min={600} max={2200} step={10} onChange={(v) => set("breite", v)} />
+            <NumberInput label="Höhe" unit="mm" value={config.hoehe} min={1500} max={2500} step={10} onChange={(v) => set("hoehe", v)} />
           </div>
         </div>
 
@@ -280,12 +282,22 @@ export default function GlasduscheKonfigurator() {
                 </p>
               </div>
               <p className="text-xs text-gray-400 text-right">
-                {config.breite} × {config.hoehe} cm<br />
+                {config.breite} × {config.hoehe} mm<br />
                 {config.glasStaerke} mm · {GLASARTEN.find((g) => g.id === config.glasArt)?.label}
               </p>
             </div>
             <button
-              onClick={() => { setAdded(true); setTimeout(() => setAdded(false), 2000); }}
+              onClick={() => {
+                addToCart({
+                  typ: "glasdusche",
+                  bezeichnung: `Glasdusche ${config.typ} ${config.breite}×${config.hoehe} mm`,
+                  config,
+                  preis,
+                  menge: 1,
+                });
+                setAdded(true);
+                setTimeout(() => setAdded(false), 2000);
+              }}
               className={`w-full py-3 rounded-lg text-sm font-medium transition-colors ${
                 added ? "bg-green-600 text-white" : "bg-gray-900 text-white hover:bg-gray-700"
               }`}

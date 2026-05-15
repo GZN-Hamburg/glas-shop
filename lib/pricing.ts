@@ -1,50 +1,154 @@
 import type {
   SpiegelConfig,
+  SpiegelForm,
+  GlasStaerke,
+  Kantenbearbeitung,
   GlasduscheConfig,
   GlastrennwandConfig,
+  PriceBreakdown,
 } from "./types";
 
-export function berechneSpiegel(config: SpiegelConfig): number {
-  const flaeche = (config.breite * config.hoehe) / 10000; // m²
-  let preis = flaeche * 180; // 180 €/m² Basis
+// ─── Konstanten ───────────────────────────────────────────────────────────────
 
-  if (config.form === "rund" || config.form === "oval") preis *= 1.15;
-  if (config.form === "schraegschnitt") preis *= 1.25;
+const MIN_FLAECHE_M2 = 0.5;
+const RUESTKOSTEN = 25;
+const BOHRUNGSPREIS = 8.5; // pro Bohrung
 
-  const beleuchtungsPreise: Record<SpiegelConfig["beleuchtung"], number> = {
-    keine: 0,
-    oben: 89,
-    "links-rechts": 149,
-    umlaufend: 229,
-    hinterleuchtet: 349,
-  };
-  preis += beleuchtungsPreise[config.beleuchtung];
+/** Grundpreis pro m² je Glasstärke (Spiegel) */
+const MATERIAL_PRO_M2: Record<GlasStaerke, number> = {
+  3: 45,
+  4: 60,
+  5: 72,
+  6: 88,
+  8: 120,
+  10: 158,
+  12: 205,
+};
 
-  const rahmenPreise: Record<SpiegelConfig["rahmen"], number> = {
-    rahmenlos: 0,
-    chrom: 79,
-    schwarz: 79,
-    gold: 119,
-  };
-  preis += rahmenPreise[config.rahmen];
+/** Kantenmeter-Preis je Bearbeitungsart */
+const KANTE_PRO_LM: Record<Kantenbearbeitung, number> = {
+  SK: 0,
+  KM: 4.5,
+  KP: 7.0,
+  steilfacette: 9.5,
+  facette10: 12.0,
+  facette25: 16.0,
+};
 
-  if (config.beschlag) preis += 49;
-  if (config.steckdose) preis += 69;
+/** Formaufschlag auf den Materialpreis (Verschnitt + Arbeitsaufwand) */
+const FORM_AUFSCHLAG: Record<SpiegelForm, number> = {
+  rechteckig: 1.0,
+  rundbogen: 1.18,
+  oval: 1.22,
+  rund: 1.12,
+  schraegschnitt: 1.28,
+  "eckabschnitt-1": 1.1,
+  "eckabschnitt-2": 1.15,
+  achteck: 1.22,
+  halbrund: 1.15,
+};
 
-  return Math.round(preis);
+// ─── Hilfsfunktionen ──────────────────────────────────────────────────────────
+
+/** Tatsächliche Fläche in m² (ohne Mindestberechnung) */
+function getFlaeche(form: SpiegelForm, breite: number, hoehe: number): number {
+  const b = breite / 1000;
+  const h = hoehe / 1000;
+  switch (form) {
+    case "rund":       return Math.PI * Math.pow(b / 2, 2);
+    case "oval":       return Math.PI * (b / 2) * (h / 2);
+    case "halbrund":   return (Math.PI * Math.pow(b / 2, 2)) / 2;
+    case "achteck":    return b * h * 0.828; // Achteck ≈ 82,8 % des Rechtecks
+    case "schraegschnitt": return b * h * 0.875;
+    case "eckabschnitt-1": return b * h - 0.5 * 0.1 * 0.1;
+    case "eckabschnitt-2": return b * h - 2 * 0.5 * 0.1 * 0.1;
+    default:           return b * h;
+  }
 }
 
+/** Umfang in laufenden Metern (für Kantenberechnung) */
+function getUmfang(form: SpiegelForm, breite: number, hoehe: number): number {
+  const b = breite / 1000;
+  const h = hoehe / 1000;
+  switch (form) {
+    case "rund":       return Math.PI * b; // Kreisumfang (breite = Durchmesser)
+    case "oval":       return Math.PI * (3 * (b + h) / 2 - Math.sqrt((3 * b + h) * (b + 3 * h)) / 2);
+    case "rundbogen":  return 2 * h + b + Math.PI * (b / 2);
+    case "halbrund":   return b + Math.PI * (b / 2);
+    case "achteck":    return 2 * (b + h) * 0.921;
+    case "schraegschnitt": return b + 2 * h + Math.sqrt(b * b + Math.pow(h * 0.25, 2));
+    case "eckabschnitt-1": return 2 * (b + h) - 2 * 0.1 + Math.SQRT2 * 0.1;
+    case "eckabschnitt-2": return 2 * (b + h) - 4 * 0.1 + 2 * Math.SQRT2 * 0.1;
+    default:           return 2 * (b + h);
+  }
+}
+
+// ─── Spiegel-Preisberechnung (mit Aufschlüsselung) ───────────────────────────
+
+export function berechneSpiegel(config: SpiegelConfig): PriceBreakdown {
+  const flaeche = getFlaeche(config.form, config.breite, config.hoehe);
+  const berechneteFlaeche = Math.max(flaeche, MIN_FLAECHE_M2);
+  const mindestberechnung = flaeche < MIN_FLAECHE_M2;
+
+  const posMaterial =
+    berechneteFlaeche *
+    MATERIAL_PRO_M2[config.glasStaerke] *
+    FORM_AUFSCHLAG[config.form];
+
+  const umfang = getUmfang(config.form, config.breite, config.hoehe);
+  const posKante = umfang * KANTE_PRO_LM[config.kante];
+
+  const posBohrungen = config.bohrungen.length * BOHRUNGSPREIS;
+
+  const veredelungsAufschlag: Record<SpiegelConfig["veredelung"], number> = {
+    keine: 0,
+    satiniert: posMaterial * 0.15,
+    getoent: posMaterial * 0.22,
+    sandgestrahlt: posMaterial * 0.38 + 48,
+  };
+  const posVeredelung = veredelungsAufschlag[config.veredelung];
+
+  const posRuestkosten = RUESTKOSTEN;
+
+  const einzelpreis =
+    posMaterial + posKante + posBohrungen + posVeredelung + posRuestkosten;
+  const gesamt = einzelpreis * config.menge;
+
+  return {
+    flaeche,
+    berechneteFlaeche,
+    mindestberechnung,
+    posMaterial,
+    posKante,
+    posBohrungen,
+    posVeredelung,
+    posRuestkosten,
+    gesamt,
+  };
+}
+
+// ─── Kantenmatrix-Validierung ─────────────────────────────────────────────────
+
+/** Gibt die erlaubten Kantenbearbeitungen für eine Glasstärke zurück */
+export function erlaubteKanten(staerke: GlasStaerke): Kantenbearbeitung[] {
+  if (staerke === 3) return ["SK", "KM", "KP"];
+  return ["SK", "KM", "KP", "steilfacette", "facette10", "facette25"];
+}
+
+// ─── Glasdusche ───────────────────────────────────────────────────────────────
+
 export function berechneGlasdusche(config: GlasduscheConfig): number {
-  const flaeche = (config.breite * config.hoehe) / 10000;
+  const flaecheRoh = (config.breite / 1000) * (config.hoehe / 1000);
+  const flaeche = Math.max(flaecheRoh, MIN_FLAECHE_M2);
   let preis = flaeche * 320;
 
   const typAufschlag: Record<GlasduscheConfig["typ"], number> = {
-    nische: 0,
+    nische: 1,
     eckeinstieg: 1.1,
     freistehend: 1.2,
     badewannenaufsatz: 0.9,
   };
-  preis *= typAufschlag[config.typ] || 1;
+  preis *= typAufschlag[config.typ];
 
   const glasPreise: Record<GlasduscheConfig["glasArt"], number> = {
     klar: 0,
@@ -56,18 +160,19 @@ export function berechneGlasdusche(config: GlasduscheConfig): number {
 
   if (config.glasStaerke === 8) preis += 80;
   if (config.glasStaerke === 10) preis += 180;
-
   if (config.nanoBeschichtung) preis += 120;
 
-  return Math.round(preis);
+  return Math.round(preis + RUESTKOSTEN);
 }
 
-export function berechneGlastrennwand(
-  config: GlastrennwandConfig
-): number {
-  const flaeche =
-    ((config.breite * config.hoehe) / 10000) * config.anzahlElemente;
-  let preis = flaeche * 280;
+// ─── Glastrennwand ────────────────────────────────────────────────────────────
+
+export function berechneGlastrennwand(config: GlastrennwandConfig): number {
+  const flaecheProEl = Math.max(
+    (config.breite / 1000) * (config.hoehe / 1000),
+    MIN_FLAECHE_M2
+  );
+  let preis = flaecheProEl * config.anzahlElemente * 280;
 
   const typAufschlag: Record<GlastrennwandConfig["typ"], number> = {
     festverglasung: 1,
@@ -87,8 +192,7 @@ export function berechneGlastrennwand(
 
   if (config.glasStaerke === 10) preis += 120;
   if (config.glasStaerke === 12) preis += 280;
-
   if (config.schallschutz) preis += 350;
 
-  return Math.round(preis);
+  return Math.round(preis + RUESTKOSTEN * config.anzahlElemente);
 }

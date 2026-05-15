@@ -29,8 +29,8 @@ const STAERKEN = [8, 10, 12] as const;
 
 const DEFAULT: GlastrennwandConfig = {
   typ: "festverglasung",
-  breite: 100,
-  hoehe: 240,
+  breite: 1000,
+  hoehe: 2400,
   glasArt: "klar",
   glasStaerke: 10,
   profilFarbe: "silber",
@@ -203,8 +203,8 @@ export default function GlastrennwandKonfigurator() {
         <div>
           <SectionTitle>Maße pro Element</SectionTitle>
           <div className="grid grid-cols-2 gap-3">
-            <NumberInput label="Breite" unit="cm" value={config.breite} min={40} max={300} onChange={(v) => set("breite", v)} />
-            <NumberInput label="Höhe" unit="cm" value={config.hoehe} min={100} max={400} onChange={(v) => set("hoehe", v)} />
+            <NumberInput label="Breite" unit="mm" value={config.breite} min={400} max={2200} step={10} onChange={(v) => set("breite", v)} />
+            <NumberInput label="Höhe" unit="mm" value={config.hoehe} min={1000} max={3500} step={10} onChange={(v) => set("hoehe", v)} />
           </div>
         </div>
 
@@ -287,7 +287,7 @@ export default function GlastrennwandKonfigurator() {
                 </p>
               </div>
               <p className="text-xs text-gray-400 text-right">
-                {config.anzahlElemente}× {config.breite}×{config.hoehe} cm<br />
+                {config.anzahlElemente}× {config.breite}×{config.hoehe} mm<br />
                 {config.glasStaerke} mm · {GLASARTEN.find((g) => g.id === config.glasArt)?.label}
               </p>
             </div>
